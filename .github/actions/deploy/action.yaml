@@ -1,0 +1,75 @@
+inputs:
+  image_name:
+    description: "Image name"
+    required: true
+  service_name:
+    description: "Cloud Run service name"
+    required: true
+  artifact:
+    description: "GCP Artifact where the image was pushed"
+    required: true
+  gcp_project_id:
+    description: "GCP project ID"
+    required: true
+  gcp_region:
+    description: "GCP region"
+    required: true
+  envs:
+    description: "APP env vars (key=value,key=secret_name)"
+    required: true
+  encrypted_envs:
+    description: "APP  ecnrcypted env vars"
+    required: true
+  workload_identity_provider:
+    required: true
+  service_account:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Authenticate with Google Cloud
+      id: auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        project_id: ${{ inputs.gcp_project_id }}
+        workload_identity_provider: ${{ inputs.workload_identity_provider }}
+        service_account: ${{ inputs.service_account }}   
+  
+    - name: 'Set up Cloud SDK'
+      uses: 'google-github-actions/setup-gcloud@v2'
+
+    - name: Prepare encrypted env vars
+      id: prepare_envs
+      run: |
+        UPDATE_SECRETS=""
+
+        IFS=',' read -ra ENCRYPTED_ENV_PAIRS <<< "${{ inputs.encrypted_envs }}"
+        for ENV_PAIR in "${ENCRYPTED_ENV_PAIRS[@]}"; do
+          IFS='=' read -ra ENV_DATA <<< "$ENV_PAIR"
+          KEY="${ENV_DATA[0]}"
+          SECRET_NAME="${ENV_DATA[1]}"
+          UPDATE_SECRETS="${UPDATE_SECRETS}${UPDATE_SECRETS:+,}$KEY=$SECRET_NAME:latest"
+        done
+
+        echo "UPDATE_SECRETS=$UPDATE_SECRETS" >> $GITHUB_ENV
+        echo "ENVS=${{ inputs.envs }}" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Deploy to Cloud Run
+      run: |
+        DEPLOY_CMD="gcloud run deploy ${{ inputs.service_name }} \
+          --image=${{ inputs.artifact }}/${{ inputs.image_name }}:latest \
+          --region=${{ inputs.gcp_region }} \
+          --platform=managed \
+          --no-allow-unauthenticated \
+          --set-env-vars=\"${{ env.ENVS }}\""
+
+        if [[ -n "${{ env.UPDATE_SECRETS }}" ]]; then
+          DEPLOY_CMD+=" --update-secrets=\"${{ env.UPDATE_SECRETS }}\""
+        fi
+        eval $DEPLOY_CMD
+      shell: bash

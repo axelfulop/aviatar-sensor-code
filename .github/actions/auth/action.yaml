@@ -1,0 +1,25 @@
+name: "Auth gcloud"
+description: "Authenticate to gcp"
+inputs:
+  gcp_project_id:
+    description: "Project ID"
+    required: true
+  gcp_identity_provider:
+    description: "Identity provider configured to allow Actions"
+    required: true
+  gcp_service_account:
+    description: "Service account created to perfom actions"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Authenticate with Google Cloud
+      uses: 'google-github-actions/auth@v2'
+      with:
+        project_id: ${{ inputs.gcp_project_id }}
+        workload_identity_provider: ${{ inputs.gcp_identity_provider }}
+        service_account: ${{ inputs.gcp_service_account }}

@@ -1,0 +1,84 @@
+name: Deploy prd APP
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+env:
+  IMAGE_NAME: sensor
+  ARTIFACT_REGION: europe-southwest1
+  ARTIFACT: sensors
+  REGISTRY: docker.pkg.dev
+  TOPIC_PATH_SECRET: sensors
+
+jobs:
+  build-publish-sensors:
+    permissions: 
+      contents: 'read'
+      id-token: 'write'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        sensors: 
+          - { id: 1 }
+          - { id: 2 }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate with Google Cloud
+        id: auth
+        uses: 'google-github-actions/auth@v2'
+        with:
+          project_id: ${{ secrets.PRD_GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ secrets.PRD_GCP_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.PRD_GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_lifetime: 300s
+
+      - name: Login to Artifact Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ${{ env.ARTIFACT_REGION }}-${{ env.REGISTRY }}
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Build and Publish Docker Image
+        uses: ./.github/actions/build-publish
+        with:
+          image_name: "${{ env.IMAGE_NAME }}${{ matrix.sensors.id }}:latest"
+          artifact: "sensors"
+          project_id: ${{ secrets.PRD_GCP_PROJECT_ID }}
+          region: ${{ env.ARTIFACT_REGION }}
+          
+  deploy-sensors:
+    needs: [ build-publish-sensors ]
+    permissions: 
+      contents: 'read'
+      id-token: 'write'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        sensors:
+          - { id: 1, region: europe-west3, envs: "SENSOR_ID=1", encrypted_envs: "TOPIC_PATH=TOPIC_ID,API_KEY=SENSOR1_API_KEY" }
+          - { id: 2, region: europe-west4, envs: "SENSOR_ID=2", encrypted_envs: "TOPIC_PATH=TOPIC_ID,API_KEY=SENSOR2_API_KEY" }
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy service
+        uses: ./.github/actions/deploy
+        with: 
+          project_id: ${{ secrets.PRD_GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ secrets.PRD_GCP_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.PRD_GCP_SERVICE_ACCOUNT }}   
+          image_name: ${{ env.IMAGE_NAME }}${{ matrix.sensors.id }}
+          service_name: sensor${{ matrix.sensors.id }}
+          gcp_project_id: ${{ secrets.PRD_GCP_PROJECT_ID }}
+          gcp_region: ${{ matrix.sensors.region }}
+          envs: ${{ matrix.sensors.envs }}
+          encrypted_envs: ${{ matrix.sensors.encrypted_envs }}
+          artifact: ${{ env.ARTIFACT_REGION }}-${{ env.REGISTRY }}/${{ secrets.PRD_GCP_PROJECT_ID }}/${{ env.ARTIFACT }}
