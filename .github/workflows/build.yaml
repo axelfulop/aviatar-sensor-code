@@ -1,6 +1,13 @@
-name: Deploy App (Manual Dispatch)
+name: Build image APP
 
 on:
+  pull_request:
+    branches:
+        - dev
+        - staging
+        - stg
+        - development
+        - main 
   workflow_dispatch:
     inputs:
       environment:
