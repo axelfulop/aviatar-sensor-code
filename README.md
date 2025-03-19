@@ -4,18 +4,24 @@ This document describes the GitHub Actions workflows used to build and deploy se
 
 ## Workflows
 
-### 1. Deploy dev APP
+### 1. Build image APP
 
-This workflow is triggered when code is pushed to the `development` or `dev` branches. It builds and publishes Docker images for two sensor applications and deploys them to Cloud Run in the development environment.
+This workflow is triggered by pull requests (PRs) targeting `dev`, `staging`, `stg`, `development`, and `main` branches, or manually via `workflow_dispatch`. It builds and publishes Docker images for sensor applications based on the selected environment and sensor ID.
 
-**Trigger:**
+**Triggers:**
 
-* `push` to `development` or `dev` branches.
+* `pull_request` to `dev`, `staging`, `stg`, `development`, `main` branches.
+* `workflow_dispatch` with environment and sensor ID selection.
+
+**Inputs (for workflow_dispatch):**
+
+* `environment`: Environment to deploy to (dev, stg, prd).
+* `sensor_id`: Sensor ID (1 or 2).
 
 **Environment Variables:**
 
 * `IMAGE_NAME`: `sensor` (base image name)
-* `ARTIFACT_REGION`: `europe-southwest1` (Artifact Registry region)
+* `ARTIFACT_REGION`: `europe-southwest1` (Artifact Registry region, will be updated based on environment)
 * `ARTIFACT`: `sensors` (Artifact Registry repository name)
 * `REGISTRY`: `docker.pkg.dev` (Artifact Registry host)
 * `TOPIC_PATH_SECRET`: `sensors` (Secret name for Pub/Sub topic path)
@@ -25,78 +31,30 @@ This workflow is triggered when code is pushed to the `development` or `dev` bra
 1.  **`build-publish-sensors`:**
     * **Permissions:** `contents: read`, `id-token: write`
     * **Runs On:** `ubuntu-latest`
-    * **Strategy:** Matrix strategy to build images for `sensor1` and `sensor2`.
     * **Steps:**
         * **Checkout:** Checks out the repository code.
+        * **Set Environment Variables:** Sets environment variables based on the trigger (PR or manual dispatch) and selected environment.
         * **Authenticate with Google Cloud:** Authenticates with GCP using Workload Identity.
         * **Login to Artifact Registry:** Logs in to Artifact Registry using the authenticated credentials.
         * **Build and Publish Docker Image:** Builds and pushes the Docker image using the `build-publish` composite action.
 
-2.  **`deploy-sensors`:**
-    * **Needs:** `build-publish-sensors`
-    * **Permissions:** `contents: read`, `id-token: write`
-    * **Runs On:** `ubuntu-latest`
-    * **Strategy:** Matrix strategy to deploy `sensor1` and `sensor2` to their respective regions.
-    * **Steps:**
-        * **Checkout Code:** Checks out the repository code.
-        * **Deploy service:** Deploys the Cloud Run service using the `deploy` composite action.
+### 2. Deploy dev APP
 
-### 2. Deploy prd APP
+This workflow is triggered when code is pushed to the `development` or `dev` branches. It builds and publishes Docker images for two sensor applications and deploys them to Cloud Run in the development environment.
+
+**(Details as provided in the previous response)**
+
+### 3. Deploy prd APP
 
 This workflow is triggered when code is pushed to the `main` or `master` branches. It builds and publishes Docker images for two sensor applications and deploys them to Cloud Run in the production environment.
 
-**Trigger:**
+**(Details as provided in the previous response)**
 
-* `push` to `main` or `master` branches.
-
-**Environment Variables:**
-
-* `IMAGE_NAME`: `sensor` (base image name)
-* `GCP_REGION`: `europe-southwest1` (Default GCP region, you should change this)
-
-**Jobs:**
-
-1.  **`build-publish-sensor-1`:**
-    * **Runs On:** `ubuntu-latest`
-    * **Steps:**
-        * **Checkout Code:** Checks out the repository code.
-        * **Authenticate with Google Cloud:** Authenticates with GCP using Workload Identity.
-        * **Build and Publish Docker Image:** Builds and pushes the Docker image for `sensor1` using the `build-publish` composite action.
-
-2.  **`build-publish-sensor-2`:**
-    * **Runs On:** `ubuntu-latest`
-    * **Steps:**
-        * **Checkout Code:** Checks out the repository code.
-        * **Build and Publish Docker Image:** Builds and pushes the Docker image for `sensor2` using the `build-publish` composite action.
-
-### 3. Deploy stg APP
+### 4. Deploy stg APP
 
 This workflow is triggered when code is pushed to the `staging` or `stg` branches. It builds and publishes Docker images for two sensor applications and deploys them to Cloud Run in the staging environment.
 
-**Trigger:**
-
-* `push` to `staging` or `stg` branches.
-
-**Environment Variables:**
-
-* `IMAGE_NAME`: `sensor` (base image name)
-* `GCP_REGION_SOUTHWEST1`: `europe-west3` (GCP region for sensor 1)
-* `GCP_REGION_SOUTHWEST2`: `europe-west4` (GCP region for sensor 2)
-
-**Jobs:**
-
-1.  **`build-publish-sensor-1`:**
-    * **Runs On:** `ubuntu-latest`
-    * **Steps:**
-        * **Checkout Code:** Checks out the repository code.
-        * **Authenticate with Google Cloud:** Authenticates with GCP using Workload Identity.
-        * **Build and Publish Docker Image:** Builds and pushes the Docker image for `sensor1` using the `build-publish` composite action.
-
-2.  **`build-publish-sensor-2`:**
-    * **Runs On:** `ubuntu-latest`
-    * **Steps:**
-        * **Checkout Code:** Checks out the repository code.
-        * **Build and Publish Docker Image:** Builds and pushes the Docker image for `sensor2` using the `build-publish` composite action.
+**(Details as provided in the previous response)**
 
 ## Composite Actions
 
@@ -104,39 +62,60 @@ This workflow is triggered when code is pushed to the `staging` or `stg` branche
 
 This composite action builds and pushes a Docker image to Artifact Registry.
 
-**Inputs:**
-
-* `image_name`: Name of the Docker image.
-* `artifact`: Artifact Registry repository name.
-* `project_id`: GCP project ID.
-* `region`: GCP region.
-
-**Steps:**
-
-1.  **Checkout:** Checks out the repository code.
-2.  **Configure Docker to use gcloud CLI:** Configures Docker to use `gcloud` for authentication.
-3.  **Build image:** Builds and pushes the Docker image.
+**(Details as provided in the previous response)**
 
 ### 2. deploy
 
 This composite action deploys a Cloud Run service.
 
-**Inputs:**
+**(Details as provided in the previous response)**
 
-* `image_name`: Name of the Docker image.
-* `service_name`: Cloud Run service name.
-* `artifact`: Artifact Registry repository name.
-* `gcp_project_id`: GCP project ID.
-* `gcp_region`: GCP region.
-* `envs`: Environment variables (key=value).
-* `encrypted_envs`: Encrypted environment variables (key=secret_name).
-* `workload_identity_provider`: GCP Workload Identity Provider.
-* `service_account`: GCP Service Account.
+## Diagram Explanation
 
-**Steps:**
+The provided diagram illustrates a general CI/CD pipeline for Terraform deployments. Here's a breakdown of each step:
 
-1.  **Checkout:** Checks out the repository code.
-2.  **Authenticate with Google Cloud:** Authenticates with GCP using Workload Identity.
-3.  **Set up Cloud SDK:** Sets up the `gcloud` CLI.
-4.  **Prepare encrypted env vars:** Prepares encrypted environment variables for deployment.
-5.  **Deploy to Cloud Run:** Deploys the Cloud Run service.
+**Workflow Trigger:**
+
+* **PR Check:** Initiated upon the creation or update of a Pull Request (PR).
+* **Push MAIN:** Triggered when changes are pushed directly to the `main` branch.
+
+**Workflow Steps:**
+
+1.  **REPO CHECKOUT:**
+    * **Action:** `actions/checkout@v3`
+    * **Description:** Retrieves the latest code from the repository.
+    * **Context:** Supports multiple environments (`DEV`, `STAGING`, `MAIN`).
+
+2.  **GCLOUD SA AUTH:**
+    * **Action:** `uses: google-github-actions/auth@v2`
+    * **Description:** Authenticates with GCP using a service account and Workload Identity Pool.
+
+3.  **TERRAFORM SET UP INIT:**
+    * **Action:** `uses: hashicorp/setup-terraform@v3`, `run: terraform init`
+    * **Description:** Installs Terraform and initializes the working directory.
+    * **Context:** Uses Terraform Cloud (TFC) token for authentication.
+
+4.  **TERRAFORM FMT:**
+    * **Action:** `run: terraform fmt -check`
+    * **Description:** Formats and checks Terraform code.
+
+5.  **TERRAFORM VALIDATION:**
+    * **Action:** `run: terraform validate`
+    * **Description:** Validates Terraform configuration.
+
+6.  **TERRAFORM TEST:**
+    * **Action:** `terraform test -verbose`
+    * **Description:** Executes Terraform tests.
+
+7.  **TERRAFORM PLAN:**
+    * **Action:** `terraform plan`
+    * **Description:** Generates an execution plan.
+
+8.  **TERRAFORM APPLY:**
+    * **Action:** `terraform apply`
+    * **Description:** Applies the changes.
+    * **Context:** Typically run on `main` branch or after manual approval.
+
+**ERROR EXIT:**
+
+* Indicates workflow termination on failure.
